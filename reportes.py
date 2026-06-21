@@ -154,10 +154,12 @@ class ReportesFrame(tk.Frame):
         self.tab_eoq = tk.Frame(self.notebook, bg="white")
         self.tab_ventas = tk.Frame(self.notebook, bg="white")
         self.tab_abc = tk.Frame(self.notebook, bg="white")
+        self.tab_seguridad = tk.Frame(self.notebook, bg="white")
 
         self.notebook.add(self.tab_eoq, text="EOQ")
         self.notebook.add(self.tab_ventas, text="Ventas Anuales")
         self.notebook.add(self.tab_abc, text="Clasificación ABC")
+        self.notebook.add(self.tab_seguridad, text="Inventario de Seguridad")
 
         self.fig_eoq = plt.Figure(figsize=(6, 4), dpi=100)
         self.ax_eoq = self.fig_eoq.add_subplot(111)
@@ -173,6 +175,11 @@ class ReportesFrame(tk.Frame):
         self.ax_abc = self.fig_abc.add_subplot(111)
         self.canvas_abc = FigureCanvasTkAgg(self.fig_abc, master=self.tab_abc)
         self.canvas_abc.get_tk_widget().pack(fill=tk.BOTH, expand=True)
+
+        self.fig_seguridad = plt.Figure(figsize=(6, 4), dpi=100)
+        self.ax_seguridad = self.fig_seguridad.add_subplot(111)
+        self.canvas_seguridad = FigureCanvasTkAgg(self.fig_seguridad, master=self.tab_seguridad)
+        self.canvas_seguridad.get_tk_widget().pack(fill=tk.BOTH, expand=True)
 
     def cargar_fechas(self):
         try:
@@ -221,6 +228,7 @@ class ReportesFrame(tk.Frame):
                     r.id_resultado,
                     r.id_producto,
                     p.nombre AS Producto,
+                    p.stock_actual,
                     r.EOQ,
                     r.PRO,
                     r.inventario_seguridad,
@@ -280,9 +288,11 @@ class ReportesFrame(tk.Frame):
         self.ax_eoq.clear()
         self.ax_ventas.clear()
         self.ax_abc.clear()
+        self.ax_seguridad.clear()
         self.canvas_eoq.draw()
         self.canvas_ventas.draw()
         self.canvas_abc.draw()
+        self.canvas_seguridad.draw()
 
     def actualizar_graficas(self):
         if self.df_datos.empty:
@@ -321,21 +331,48 @@ class ReportesFrame(tk.Frame):
                     sizes.append(abc_counts[cat])
 
             if sizes:
+                def autopct_with_label(pct, all_labels=labels):
+                    autopct_with_label.index = getattr(autopct_with_label, 'index', 0)
+                    label = all_labels[autopct_with_label.index] if autopct_with_label.index < len(all_labels) else ''
+                    text = f"{label} {pct:.1f}%"
+                    autopct_with_label.index += 1
+                    return text
+
                 self.ax_abc.pie(
                     sizes,
                     labels=labels,
-                    autopct='%1.1f%%',
+                    autopct=autopct_with_label,
                     colors=['#0A1F44', '#5A7FB8', '#8FA6D7'],
                     textprops={'color': 'white'}
                 )
                 self.ax_abc.set_title('Clasificación ABC', color='#0A1F44', fontweight='bold')
 
+        # Inventario de seguridad: productos en riesgo vs seguros
+        df_seguridad = self.df_datos.copy()
+        df_seguridad['stock_actual'] = pd.to_numeric(df_seguridad.get('stock_actual', 0), errors='coerce').fillna(0)
+        df_seguridad['inventario_seguridad'] = pd.to_numeric(df_seguridad.get('inventario_seguridad', 0), errors='coerce').fillna(0)
+        riesgo = int((df_seguridad['stock_actual'] < df_seguridad['inventario_seguridad']).sum())
+        seguro = int((df_seguridad['stock_actual'] >= df_seguridad['inventario_seguridad']).sum())
+
+        if riesgo + seguro > 0:
+            self.ax_seguridad.pie(
+                [riesgo, seguro],
+                labels=['En riesgo', 'Seguro'],
+                autopct='%1.1f%%',
+                colors=['#E74C3C', '#2ECC71'],
+                startangle=90,
+                textprops={'color': 'white'}
+            )
+            self.ax_seguridad.set_title('Cumplimiento Inventario de Seguridad', color='#0A1F44', fontweight='bold')
+
         self.fig_eoq.tight_layout()
         self.fig_ventas.tight_layout()
         self.fig_abc.tight_layout()
+        self.fig_seguridad.tight_layout()
         self.canvas_eoq.draw()
         self.canvas_ventas.draw()
         self.canvas_abc.draw()
+        self.canvas_seguridad.draw()
 
     def exportar_reporte(self):
         ruta_archivo = filedialog.asksaveasfilename(

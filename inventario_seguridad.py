@@ -91,16 +91,13 @@ class InventarioSeguridadFrame(tk.Frame):
 
         columnas = (
             "Código", "Producto", "Stock Actual", "Variabilidad de Demanda",
-            "Días de Entrega", "Inventario de Seguridad", "Marca"
+            "Días de Entrega", "Inventario de Seguridad", "Estado"
         )
         self.tree = ttk.Treeview(self.contenido_frame,
                                  columns=columnas,
                                  show="headings",
                                  height=15,
                                  style="Seguridad.Treeview")
-
-        self.tree.tag_configure('evenrow', background='white')
-        self.tree.tag_configure('oddrow', background='#F7F7F7')
 
         anchos = {
             "Código": 90,
@@ -109,7 +106,7 @@ class InventarioSeguridadFrame(tk.Frame):
             "Variabilidad de Demanda": 160,
             "Días de Entrega": 120,
             "Inventario de Seguridad": 160,
-            "Marca": 80
+            "Estado": 120
         }
 
         for col in columnas:
@@ -162,7 +159,7 @@ class InventarioSeguridadFrame(tk.Frame):
                     inventario_seguridad = self.Z_FACTOR * variabilidad * tiempo_entrega.sqrt()
 
                 inventario_seguridad_entero = inventario_seguridad.to_integral_value()
-                marca = stock_actual < inventario_seguridad_entero
+                estado = "❌ Riesgo" if stock_actual < inventario_seguridad_entero else "✅ Seguro"
 
                 producto_seguridad = {
                     'id_producto': prod['id_producto'],
@@ -172,15 +169,14 @@ class InventarioSeguridadFrame(tk.Frame):
                     'variabilidad_demanda': variabilidad,
                     'tiempo_entrega': tiempo_entrega,
                     'inventario_seguridad': inventario_seguridad_entero,
-                    'marca': marca
+                    'estado': estado
                 }
                 productos_seguridad.append(producto_seguridad)
 
             # Guardar datos originales para búsqueda
             self.datos_originales = productos_seguridad
 
-            for idx, prod in enumerate(productos_seguridad):
-                marca_display = "✓" if prod['marca'] else ""
+            for prod in productos_seguridad:
                 valores = (
                     prod['codigo'],
                     prod['nombre'],
@@ -188,10 +184,9 @@ class InventarioSeguridadFrame(tk.Frame):
                     f"{prod['variabilidad_demanda']}",
                     f"{prod['tiempo_entrega']:.0f}",
                     f"{prod['inventario_seguridad']:.0f}",
-                    marca_display
+                    prod['estado']
                 )
-                tag = 'evenrow' if idx % 2 == 0 else 'oddrow'
-                self.tree.insert('', 'end', values=valores, tags=(tag,))
+                self.tree.insert('', 'end', values=valores)
 
         except mysql.connector.Error as e:
             print(f"Error al ejecutar consulta de inventario de seguridad: {e}")
@@ -220,8 +215,7 @@ class InventarioSeguridadFrame(tk.Frame):
                     datos_filtrados.append(producto)
         
         # Insertar datos filtrados en la tabla
-        for idx, prod in enumerate(datos_filtrados):
-            marca_display = "✓" if prod['marca'] else ""
+        for prod in datos_filtrados:
             valores = (
                 prod['codigo'],
                 prod['nombre'],
@@ -229,8 +223,7 @@ class InventarioSeguridadFrame(tk.Frame):
                 f"{prod['variabilidad_demanda']}",
                 f"{prod['tiempo_entrega']:.0f}",
                 f"{prod['inventario_seguridad']:.0f}",
-                marca_display
+                prod['estado']
             )
-            tag = 'evenrow' if idx % 2 == 0 else 'oddrow'
-            self.tree.insert('', 'end', values=valores, tags=(tag,))
+            self.tree.insert('', 'end', values=valores)
 

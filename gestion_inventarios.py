@@ -30,6 +30,7 @@ class GestionInventariosFrame(tk.Frame):
 
         # Variable para almacenar datos originales para búsqueda
         self.datos_originales = []
+        self.editar_producto_id = None
 
         # Configurar el frame principal
         self.configure(bg=self.color_fondo)
@@ -189,7 +190,7 @@ class GestionInventariosFrame(tk.Frame):
         frame_tabla.pack(fill=tk.BOTH, expand=True, padx=20, pady=(0, 20))
 
         # Crear Treeview con columnas
-        columnas = ('codigo', 'nombre', 'categoria', 'stock', 'costo_unitario','proveedor')
+        columnas = ('codigo', 'nombre', 'categoria', 'stock', 'costo_unitario', 'proveedor', 'acciones')
         self.tabla = ttk.Treeview(
             frame_tabla,
             columns=columnas,
@@ -204,7 +205,8 @@ class GestionInventariosFrame(tk.Frame):
             'categoria': 'Categoría',
             'stock': 'Stock Actual',
             'costo_unitario': 'Costo Unitario',
-            'proveedor': 'Proveedor'
+            'proveedor': 'Proveedor',
+            'acciones': 'Acciones'
         }
 
         for col, texto in encabezados.items():
@@ -222,6 +224,8 @@ class GestionInventariosFrame(tk.Frame):
                 self.tabla.column(col, width=120, anchor=tk.E)
             elif col == 'proveedor':
                 self.tabla.column(col, width=200, anchor=tk.W)
+            elif col == 'acciones':
+                self.tabla.column(col, width=90, anchor=tk.CENTER)
 
         # Scrollbar vertical
         scrollbar = ttk.Scrollbar(frame_tabla, orient=tk.VERTICAL, command=self.tabla.yview)
@@ -232,6 +236,7 @@ class GestionInventariosFrame(tk.Frame):
         scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
 
         # Habilitar filas alternadas
+        self.tabla.bind('<ButtonRelease-1>', self.on_click_tabla)
         self.tabla.tag_configure('oddrow', background=self.color_gris_claro)
         self.tabla.tag_configure('evenrow', background=self.color_fondo)
 
@@ -251,7 +256,7 @@ class GestionInventariosFrame(tk.Frame):
             cursor = connection.cursor()
 
             # Ejecutar consulta para obtener datos 
-            query = "SELECT codigo, nombre, categoria, stock_actual, costo_unitario, proveedor FROM Productos ORDER BY nombre"
+            query = "SELECT id_producto, codigo, nombre, categoria, stock_actual, costo_unitario, proveedor FROM Productos ORDER BY nombre"
             cursor.execute(query)
 
             # Obtener resultados
@@ -267,21 +272,22 @@ class GestionInventariosFrame(tk.Frame):
             # Insertar datos en la tabla
             for i, producto in enumerate(productos):
                 # Formatear el costo unitario como moneda costarricense
-                costo_formateado = f"₡{producto[4]:,.2f}" if producto[4] else "₡0.00"
+                costo_formateado = f"₡{producto[5]:,.2f}" if producto[5] else "₡0.00"
 
                 # Preparar valores para la tabla
                 valores = (
-                    producto[0],  # código
-                    producto[1],  # nombre
-                    producto[2],  # categoria
-                    str(producto[3]),  # stock_actual
+                    producto[1],  # código
+                    producto[2],  # nombre
+                    producto[3],  # categoria
+                    str(producto[4]),  # stock_actual
                     costo_formateado,  # costo_unitario
-                    producto[5] if producto[5] else "N/A"  # proveedor
+                    producto[6] if producto[6] else "N/A",  # proveedor
+                    '✏️ 🗑️'  # acciones
                 )
 
                 # Determinar tag para filas alternadas
                 tag = 'oddrow' if i % 2 else 'evenrow'
-                self.tabla.insert('', tk.END, values=valores, tags=(tag,))
+                self.tabla.insert('', tk.END, values=valores, tags=(tag,), iid=str(producto[0]))
 
             # Cerrar cursor y conexión
             cursor.close()
@@ -295,16 +301,66 @@ class GestionInventariosFrame(tk.Frame):
             for item in self.tabla.get_children():
                 self.tabla.delete(item)
 
-    def on_agregar_producto(self):
-        """Abre el formulario para agregar un nuevo producto."""
-        if hasattr(self, 'ventana_agregar') and self.ventana_agregar.winfo_exists():
-            self.ventana_agregar.lift()
+    def on_click_tabla(self, event=None):
+        """Maneja el clic en la tabla para la columna de acciones."""
+        item_id = self.tabla.identify_row(event.y)
+        column = self.tabla.identify_column(event.x)
+        if not item_id or column != '#7':
             return
 
+        bbox = self.tabla.bbox(item_id, 'acciones')
+        if not bbox:
+            return
+
+        x_relative = event.x - bbox[0]
+        if x_relative < bbox[2] / 2:
+            self.editar_producto(int(item_id))
+            return
+
+        if messagebox.askyesno("Eliminar producto", "¿Desea eliminar este producto? Esta acción no se puede deshacer?"):
+            self._delete_producto(int(item_id))
+
+    def editar_producto(self, producto_id):
+        for producto in self.datos_originales:
+            if producto[0] == producto_id:
+                self.on_agregar_producto(producto)
+                return
+
+    def _delete_producto(self, id_producto):
+        connection = get_connection()
+        if not connection:
+            messagebox.showerror("Error", "No se pudo establecer conexión con la base de datos.")
+            return
+
+        cursor = None
+        try:
+            cursor = connection.cursor()
+            cursor.execute("DELETE FROM Resultados_Modelos WHERE id_producto=%s", (id_producto,))
+            cursor.execute("DELETE FROM Parametros WHERE id_producto=%s", (id_producto,))
+            cursor.execute("DELETE FROM Productos WHERE id_producto=%s", (id_producto,))
+            connection.commit()
+            self.cargar_datos()
+            messagebox.showinfo("Producto eliminado", "El producto fue eliminado correctamente.")
+        except Exception as e:
+            if connection:
+                connection.rollback()
+            messagebox.showerror("Error", f"No se pudo eliminar el producto: {e}")
+        finally:
+            if cursor:
+                cursor.close()
+            if connection:
+                connection.close()
+
+    def on_agregar_producto(self, producto=None):
+        """Abre el formulario para agregar un nuevo producto o editar uno existente."""
+        if hasattr(self, 'ventana_agregar') and self.ventana_agregar.winfo_exists():
+            self.ventana_agregar.destroy()
+
+        self.editar_producto_id = producto[0] if producto else None
         self.ventana_agregar = tk.Toplevel(self)
-        self.ventana_agregar.title("Agregar Producto")
+        self.ventana_agregar.title("Editar Producto" if producto else "Agregar Producto")
         self.ventana_agregar.configure(bg=self.color_fondo)
-        self.ventana_agregar.geometry("520x620")
+        self.ventana_agregar.geometry("440x620")
         self.ventana_agregar.transient(self)
         self.ventana_agregar.grab_set()
         self.ventana_agregar.resizable(False, False)
@@ -339,7 +395,7 @@ class GestionInventariosFrame(tk.Frame):
             highlightthickness=1,
             bd=0
         )
-        form_card.pack(fill=tk.BOTH, expand=True, padx=8, pady=8)
+        form_card.pack(fill=tk.BOTH, expand=True, padx=80, pady=8)
 
         header_frame = tk.Frame(form_card, bg='#FFFFFF')
         header_frame.pack(fill=tk.X, padx=12, pady=(12, 6))
@@ -347,7 +403,7 @@ class GestionInventariosFrame(tk.Frame):
         
         titulo_label = tk.Label(
             header_frame,
-            text="Agregar Producto",
+            text="Editar Producto" if producto else "Agregar Producto",
             bg='#FFFFFF',
             fg='#0A1F44',
             font=('Segoe UI', 14, 'bold')
@@ -464,6 +520,20 @@ class GestionInventariosFrame(tk.Frame):
         )
         btn_guardar.pack(side=tk.RIGHT)
 
+        if producto:
+            self.entradas_producto['nombre'].insert(0, producto[2])
+            self.entradas_producto['categoria'].insert(0, producto[3] or "")
+            self.entradas_producto['stock_actual'].insert(0, str(producto[4]))
+            self.entradas_producto['costo_unitario'].insert(0, str(producto[5] if producto[5] is not None else ""))
+            self.entradas_producto['proveedor'].insert(0, producto[6] or "")
+
+            parametros = self._load_parametros(producto[0])
+            if parametros:
+                self.entradas_parametros['demanda_anual'].insert(0, str(parametros[0] if parametros[0] is not None else ""))
+                self.entradas_parametros['costo_pedido'].insert(0, str(parametros[1] if parametros[1] is not None else ""))
+                self.entradas_parametros['costo_mantenimiento'].insert(0, str(parametros[2] if parametros[2] is not None else ""))
+                self.entradas_parametros['tiempo_entrega'].insert(0, str(parametros[3] if parametros[3] is not None else ""))
+
     def guardar_producto(self):
         """Valida los datos del formulario y guarda el producto en la base de datos."""
         nombre = self.entradas_producto['nombre'].get().strip()
@@ -492,22 +562,44 @@ class GestionInventariosFrame(tk.Frame):
         tiempo_entrega = self._parse_int(self.entradas_parametros['tiempo_entrega'].get().strip())
         variabilidad_demanda = round(5 + random.random() * 35, 2)
 
-        try:
-            self._insert_producto(
-                nombre=nombre,
-                categoria=categoria,
-                stock_actual=stock_actual,
-                costo_unitario=costo_unitario,
-                proveedor=proveedor,
-                demanda_anual=demanda_anual,
-                costo_pedido=costo_pedido,
-                costo_mantenimiento=costo_mantenimiento,
-                tiempo_entrega=tiempo_entrega,
-                variabilidad_demanda=variabilidad_demanda
-            )
-        except Exception as e:
-            messagebox.showerror("Error", f"No se pudo guardar el producto: {e}")
-            return
+        if self.editar_producto_id:
+            try:
+                self._update_producto(
+                    id_producto=self.editar_producto_id,
+                    nombre=nombre,
+                    categoria=categoria,
+                    stock_actual=stock_actual,
+                    costo_unitario=costo_unitario,
+                    proveedor=proveedor,
+                    demanda_anual=demanda_anual,
+                    costo_pedido=costo_pedido,
+                    costo_mantenimiento=costo_mantenimiento,
+                    tiempo_entrega=tiempo_entrega,
+                    variabilidad_demanda=variabilidad_demanda
+                )
+                messagebox.showinfo("Producto actualizado", "El producto se actualizó correctamente.")
+                self.ventana_agregar.destroy()
+                self.editar_producto_id = None
+                self.cargar_datos()
+            except Exception as e:
+                messagebox.showerror("Error", f"No se pudo actualizar el producto: {e}")
+        else:
+            try:
+                self._insert_producto(
+                    nombre=nombre,
+                    categoria=categoria,
+                    stock_actual=stock_actual,
+                    costo_unitario=costo_unitario,
+                    proveedor=proveedor,
+                    demanda_anual=demanda_anual,
+                    costo_pedido=costo_pedido,
+                    costo_mantenimiento=costo_mantenimiento,
+                    tiempo_entrega=tiempo_entrega,
+                    variabilidad_demanda=variabilidad_demanda
+                )
+            except Exception as e:
+                messagebox.showerror("Error", f"No se pudo guardar el producto: {e}")
+                return
 
     def _parse_int(self, valor):
         if not valor:
@@ -594,6 +686,59 @@ class GestionInventariosFrame(tk.Frame):
             if connection:
                 connection.close()
 
+    def _load_parametros(self, id_producto):
+        connection = get_connection()
+        if not connection:
+            return None
+        cursor = None
+        try:
+            cursor = connection.cursor()
+            cursor.execute(
+                "SELECT demanda_anual, costo_pedido, costo_mantenimiento, tiempo_entrega FROM Parametros WHERE id_producto=%s",
+                (id_producto,)
+            )
+            return cursor.fetchone()
+        except Exception:
+            return None
+        finally:
+            if cursor:
+                cursor.close()
+            if connection:
+                connection.close()
+
+    def _update_producto(self, id_producto, nombre, categoria, stock_actual, costo_unitario, proveedor,
+                         demanda_anual, costo_pedido, costo_mantenimiento, tiempo_entrega, variabilidad_demanda):
+        connection = get_connection()
+        if not connection:
+            raise Exception("No se pudo establecer la conexión con la base de datos.")
+
+        cursor = None
+        try:
+            cursor = connection.cursor()
+            cursor.execute(
+                "UPDATE Productos SET nombre=%s, categoria=%s, stock_actual=%s, costo_unitario=%s, proveedor=%s WHERE id_producto=%s",
+                (nombre, categoria, stock_actual, costo_unitario, proveedor, id_producto)
+            )
+            cursor.execute(
+                "UPDATE Parametros SET demanda_anual=%s, costo_pedido=%s, costo_mantenimiento=%s, tiempo_entrega=%s, variabilidad_demanda=%s WHERE id_producto=%s",
+                (demanda_anual, costo_pedido, costo_mantenimiento, tiempo_entrega, variabilidad_demanda, id_producto)
+            )
+            if cursor.rowcount == 0:
+                cursor.execute(
+                    "INSERT INTO Parametros (id_producto, demanda_anual, costo_pedido, costo_mantenimiento, tiempo_entrega, variabilidad_demanda) VALUES (%s, %s, %s, %s, %s, %s)",
+                    (id_producto, demanda_anual, costo_pedido, costo_mantenimiento, tiempo_entrega, variabilidad_demanda)
+                )
+            connection.commit()
+        except Exception as e:
+            if connection:
+                connection.rollback()
+            raise
+        finally:
+            if cursor:
+                cursor.close()
+            if connection:
+                connection.close()
+
     def on_buscar_tiempo_real(self, event=None):
         """Realiza búsqueda en tiempo real mientras se escribe en el campo."""
         termino_busqueda = self.entry_busqueda.get().strip().lower()
@@ -610,30 +755,31 @@ class GestionInventariosFrame(tk.Frame):
             datos_filtrados = []
             for producto in self.datos_originales:
                 # Buscar en código, nombre, categoría y proveedor
-                if (termino_busqueda in str(producto[0]).lower() or
-                    termino_busqueda in str(producto[1]).lower() or
+                if (termino_busqueda in str(producto[1]).lower() or
                     termino_busqueda in str(producto[2]).lower() or
-                    termino_busqueda in str(producto[5]).lower()):
+                    termino_busqueda in str(producto[3]).lower() or
+                    termino_busqueda in str(producto[6] if producto[6] else "").lower()):
                     datos_filtrados.append(producto)
         
         # Insertar datos filtrados en la tabla
         for i, producto in enumerate(datos_filtrados):
             # Formatear el costo unitario como moneda costarricense
-            costo_formateado = f"₡{producto[4]:,.2f}" if producto[4] else "₡0.00"
+            costo_formateado = f"₡{producto[5]:,.2f}" if producto[5] else "₡0.00"
 
             # Preparar valores para la tabla
             valores = (
-                producto[0],  # código
-                producto[1],  # nombre
-                producto[2],  # categoria
-                str(producto[3]),  # stock_actual
+                producto[1],  # código
+                producto[2],  # nombre
+                producto[3],  # categoria
+                str(producto[4]),  # stock_actual
                 costo_formateado,  # costo_unitario
-                producto[5] if producto[5] else "N/A"  # proveedor
+                producto[6] if producto[6] else "N/A",  # proveedor
+                '✏️ 🗑️'  # acciones
             )
 
             # Determinar tag para filas alternadas
             tag = 'oddrow' if i % 2 else 'evenrow'
-            self.tabla.insert('', tk.END, values=valores, tags=(tag,))
+            self.tabla.insert('', tk.END, values=valores, tags=(tag,), iid=str(producto[0]))
 
 
 # Función de prueba para ejecutar el módulo de forma independiente
