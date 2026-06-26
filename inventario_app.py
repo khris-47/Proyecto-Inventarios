@@ -103,7 +103,7 @@ class InventarioApp(tk.Tk):
             "Gestionar Inventarios",
             "Evaluar Inventarios",
             "Inventario de Seguridad",
-            "Reportes"
+            "Dashboard"
         ]
         
         # Crear botones
@@ -202,7 +202,7 @@ class InventarioApp(tk.Tk):
             self.cambiar_frame(GestionInventariosFrame)
         elif nombre_boton == "Inventario de Seguridad":
             self.cambiar_frame(InventarioSeguridadFrame)
-        elif nombre_boton == "Reportes":
+        elif nombre_boton == "Dashboard":
             self.cambiar_frame(ReportesFrame)
     
     def on_hover_enter(self, button):

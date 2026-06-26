@@ -1,246 +1,273 @@
 import tkinter as tk
 from tkinter import ttk, messagebox, filedialog
+import customtkinter as ctk
 
 import matplotlib.pyplot as plt
+import matplotlib.gridspec as gridspec
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+import matplotlib.ticker as mticker
 import pandas as pd
 from db_config import get_connection
 
 
-class ReportesFrame(tk.Frame):
+class ReportesFrame(ctk.CTkFrame):  # Cambiado a CTkFrame para consistencia
     def __init__(self, master=None, **kwargs):
-        super().__init__(master, **kwargs)
+        # Inicializar con el fondo gris suave moderno del sistema
+        super().__init__(master, fg_color="#F8FAFC", **kwargs)
         self.master = master
         self.fecha_seleccionada = None
         self.df_datos = pd.DataFrame()
-        self.datos_originales = []
 
-        self.crear_panel_titulo()
-        self.crear_panel_filtro()
-        self.crear_panel_exportar()
-        self.crear_panel_busqueda()
+        # Paleta de colores unificada
+        self.color_primario = "#0A1F44"
+        self.color_secundario = "#5A7FB8"
+        self.color_exito = "#10B981"       # Verde esmeralda moderno
+        self.color_alerta = "#EF4444"      # Rojo suave moderno para el Riesgo
+        self.color_texto = "#1E293B"
 
-        # Frame central para tabla y graficas
-        self.main_content = tk.Frame(self)
-        self.main_content.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
-
-        # Frame izquierdo para tabla
-        self.left_frame = tk.Frame(self.main_content)
-        self.left_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(0, 5))
-
-        # Frame derecho para graficas
-        self.right_frame = tk.Frame(self.main_content)
-        self.right_frame.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True, padx=(5, 0))
-
-        self.crear_tabla_reportes()
-        self.crear_graficas()
+        self.crear_panel_navbar()
+        self.crear_panel_kpis()
+        self.crear_contenido_principal()
 
         self.cargar_fechas()
         self.cargar_reportes()
 
-    def crear_panel_titulo(self):
-        title_frame = tk.Frame(self, bg="white")
-        title_frame.pack(fill=tk.X, padx=10, pady=(10, 5))
-        
-        title_label = tk.Label(
-            title_frame, 
-            text="Reportes de Inventarios", 
-            bg="white", 
-            fg="#0A1F44", 
-            font=("Segoe UI", 14, "bold")
+    def crear_panel_navbar(self):
+        navbar = ctk.CTkFrame(self, fg_color="transparent", height=60)
+        navbar.pack(fill=tk.X, padx=20, pady=(20, 5))
+        navbar.pack_propagate(False)
+
+        title_label = ctk.CTkLabel(
+            navbar,
+            text="Dashboard de Gestión",
+            text_color=self.color_primario,
+            font=("Segoe UI", 18, "bold")
         )
-        title_label.pack(side=tk.LEFT, padx=10, pady=10)
+        title_label.pack(side=tk.LEFT, padx=5)
 
-    def crear_panel_filtro(self):
-        filtro_frame = tk.Frame(self, bg="white")
-        filtro_frame.pack(fill=tk.X, padx=10, pady=(0, 5))
+        controls = ctk.CTkFrame(navbar, fg_color="transparent")
+        controls.pack(side=tk.RIGHT, padx=5)
 
-        lbl_fecha = tk.Label(
-            filtro_frame,
+        lbl_fecha = ctk.CTkLabel(
+            controls,
             text="Fecha de Cálculo:",
-            bg="white",
-            fg="#0A1F44",
-            font=("Segoe UI", 10, "bold")
+            text_color=self.color_primario,
+            font=("Segoe UI", 11, "bold")
         )
-        lbl_fecha.pack(side=tk.LEFT, padx=(0, 5), pady=5)
+        lbl_fecha.pack(side=tk.LEFT, padx=(0, 8))
 
-        self.cb_fechas = ttk.Combobox(
-            filtro_frame,
-            state="readonly",
-            width=30,
-            font=("Segoe UI", 10)
+        # Reemplazo por un CTkComboBox moderno y estilizado internamente
+        # Alternativa con CTkOptionMenu (Menú de opciones plano y moderno)
+        self.cb_fechas = ctk.CTkOptionMenu(
+            controls,
+            width=220,
+            font=("Segoe UI", 11, "bold"),
+            fg_color=self.color_primario,
+            button_color=self.color_primario,
+            button_hover_color="#1E3A5F",
+            text_color="white",
+            
+            # Estilo del menú desplegable
+            dropdown_fg_color="white",
+            dropdown_text_color=self.color_texto,
+            dropdown_hover_color="#F1F5F9",
+            dropdown_font=("Segoe UI", 11)
         )
-        self.cb_fechas.pack(side=tk.LEFT, padx=(0, 10), pady=5)
-        self.cb_fechas.bind("<<ComboboxSelected>>", self.on_fecha_select)
+        self.cb_fechas.pack(side=tk.LEFT, padx=(0, 15))
+        self.cb_fechas.configure(command=self.on_fecha_select)
 
-    def crear_panel_exportar(self):
-        export_frame = tk.Frame(self, bg="white")
-        export_frame.pack(fill=tk.X, padx=10, pady=(0, 10))
-
-        style = ttk.Style()
-        style.configure(
-            "Export.TButton",
-            background="#0A1F44",
-            foreground="white",
-            font=("Segoe UI", 10, "bold"),
-            borderwidth=0,
-            padding=8
-        )
-        style.map(
-            "Export.TButton",
-            background=[('active', '#1E3A5F'), ('pressed', '#0A1F44')]
-        )
-
-        btn_exportar = ttk.Button(
-            export_frame,
+        btn_exportar = ctk.CTkButton(
+            controls,
             text="Exportar a Excel",
             command=self.exportar_reporte,
-            style="Export.TButton"
+            font=("Segoe UI", 11, "bold"),
+            fg_color=self.color_primario,
+            hover_color="#1E3A5F",
+            text_color="white",
+            corner_radius=8,
+            height=32
         )
-        btn_exportar.pack(side=tk.RIGHT, pady=5)
+        btn_exportar.pack(side=tk.LEFT)
 
-    def crear_panel_busqueda(self):
-        """Crea el panel de búsqueda en tiempo real."""
-        panel_busqueda = tk.Frame(self, bg="white")
-        panel_busqueda.pack(fill=tk.X, padx=10, pady=(0, 10))
+    def crear_panel_kpis(self):
+        self.kpi_frame = ctk.CTkFrame(self, fg_color="transparent")
+        self.kpi_frame.pack(fill=tk.X, padx=20, pady=10)
 
-        lbl_buscar = tk.Label(
-            panel_busqueda,
-            text="Buscar:",
-            font=("Segoe UI", 11),
-            bg="white",
-            fg="#0A1F44"
+        tarjeta_info = [
+            {'titulo': 'Producto Estrella',         'atributo': 'producto_estrella',        'color': self.color_primario, 'icono': '📦'},
+            {'titulo': 'Mayor EOQ',                 'atributo': 'mayor_eoq',                'color': self.color_primario, 'icono': '📉'},
+            {'titulo': 'Promedio Tiempo de Entrega','atributo': 'promedio_tiempo_entrega', 'color': self.color_primario, 'icono': '⏱️'},
+            {'titulo': 'Productos en Riesgo',       'atributo': 'productos_en_riesgo',      'color': '#D97706', 'icono': '⚠️'},
+        ]
+
+        self.kpi_labels = {}
+        self.kpi_subtitles = {}
+
+        for index, item in enumerate(tarjeta_info):
+            # Tarjetas refinadas con bordes suaves y redondeados
+            tarjeta = ctk.CTkFrame(
+                self.kpi_frame, 
+                fg_color="white", 
+                corner_radius=12,
+                border_width=1,
+                border_color="#E2E8F0"
+            )
+            tarjeta.grid(row=0, column=index, sticky='nsew', padx=6, pady=2)
+            self.kpi_frame.grid_columnconfigure(index, weight=1)
+
+            # --- TÍTULOS DE LOS KPIS MÁS GRANDES ---
+            ctk.CTkLabel(
+                tarjeta,
+                text=f"{item['icono']} {item['titulo']}",
+                text_color=item['color'],
+                font=("Segoe UI", 14, "bold")  # Aumentado de 11 a 14 para mayor jerarquía
+            ).pack(anchor='center', padx=12, pady=(18, 2))
+
+            subtitle = None
+            if item['atributo'] == 'mayor_eoq':
+                subtitle = ctk.CTkLabel(
+                    tarjeta,
+                    text='',
+                    text_color="#64748B",  # Texto gris para mejorar jerarquía visual
+                    font=("Segoe UI", 10, "italic") # Ajustado a 10 para balancear con el título
+                )
+                subtitle.pack(anchor='center', padx=12, pady=(0, 2))
+                self.kpi_subtitles[item['atributo']] = subtitle
+
+            valor = ctk.CTkLabel(
+                tarjeta, 
+                text="-",
+                text_color=self.color_primario,
+                font=("Segoe UI", 24, "bold")  # Aumentado ligeramente a 24 para que guarde proporción
+            )
+            valor.pack(anchor='center', padx=12, pady=(0, 18))
+            self.kpi_labels[item['atributo']] = valor
+    def crear_contenido_principal(self):
+        self.main_frame = ctk.CTkFrame(self, fg_color="transparent")
+        self.main_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=(0, 20))
+
+        # Tarjeta contenedora para los gráficos unificados
+        tarjeta_graficos = ctk.CTkFrame(
+            self.main_frame,
+            fg_color="white",
+            corner_radius=12,
+            border_width=1,
+            border_color="#E2E8F0"
         )
-        lbl_buscar.pack(side=tk.LEFT, padx=(0, 10))
+        tarjeta_graficos.pack(fill=tk.BOTH, expand=True)
 
-        self.entry_busqueda = tk.Entry(
-            panel_busqueda,
-            font=("Segoe UI", 11),
-            relief=tk.SOLID,
-            bd=2,
-            bg="#E8E8E8",
-            fg="#0A1F44",
-            insertbackground="#0A1F44"
+        self.fig = plt.Figure(figsize=(14, 4.5), dpi=100)
+        self.fig.patch.set_facecolor('white') # El lienzo ahora es blanco puro
+
+        gs = gridspec.GridSpec(
+            1, 3,
+            figure=self.fig,
+            left=0.08, right=0.96, # Ajustado el margen izquierdo para evitar textos recortados
+            top=0.88, bottom=0.20,
+            wspace=0.38
         )
-        self.entry_busqueda.pack(side=tk.LEFT, fill=tk.X, expand=True)
-        self.entry_busqueda.bind('<KeyRelease>', self.on_buscar_tiempo_real)
 
-    def crear_tabla_reportes(self):
-        # Estilo de encabezados
-        style = ttk.Style()
-        style.configure("Treeview.Heading", background="#0A1F44", foreground="white", font=("Segoe UI", 10, "bold"))
-        
-        # Frame para la tabla con scrollbar
-        table_frame = tk.Frame(self.left_frame)
-        table_frame.pack(fill=tk.BOTH, expand=True)
-        
-        scrollbar = ttk.Scrollbar(table_frame, orient=tk.VERTICAL)
-        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
-        
-        columnas = ("Producto", "EOQ", "PRO", "Inventario de Seguridad", "Ventas Anuales", "Clasificación ABC")
-        self.tree = ttk.Treeview(table_frame, columns=columnas, show="headings", yscrollcommand=scrollbar.set)
-        
-        for col in columnas:
-            self.tree.heading(col, text=col)
-            self.tree.column(col, width=120, anchor=tk.CENTER)
-            
-        self.tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-        scrollbar.config(command=self.tree.yview)
+        self.ax_ventas    = self.fig.add_subplot(gs[0, 0])
+        self.ax_abc       = self.fig.add_subplot(gs[0, 1])
+        self.ax_seguridad = self.fig.add_subplot(gs[0, 2])
 
-    def crear_graficas(self):
-        self.notebook = ttk.Notebook(self.right_frame)
-        self.notebook.pack(fill=tk.BOTH, expand=True)
+        self.canvas = FigureCanvasTkAgg(self.fig, master=tarjeta_graficos)
+        self.canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
 
-        self.tab_eoq = tk.Frame(self.notebook, bg="white")
-        self.tab_ventas = tk.Frame(self.notebook, bg="white")
-        self.tab_abc = tk.Frame(self.notebook, bg="white")
-        self.tab_seguridad = tk.Frame(self.notebook, bg="white")
+    def _estilo_ax(self, ax, title):
+        """Aplica fondo blanco y título uniforme a un eje."""
+        ax.set_facecolor('white')
+        ax.set_title(title, color=self.color_primario, fontweight='bold', fontsize=11, pad=12)
 
-        self.notebook.add(self.tab_eoq, text="EOQ")
-        self.notebook.add(self.tab_ventas, text="Ventas Anuales")
-        self.notebook.add(self.tab_abc, text="Clasificación ABC")
-        self.notebook.add(self.tab_seguridad, text="Inventario de Seguridad")
+    def _grafico_pastel(self, ax, sizes, labels, colors, title):
+        if not sizes:
+            return
 
-        self.fig_eoq = plt.Figure(figsize=(6, 4), dpi=100)
-        self.ax_eoq = self.fig_eoq.add_subplot(111)
-        self.canvas_eoq = FigureCanvasTkAgg(self.fig_eoq, master=self.tab_eoq)
-        self.canvas_eoq.get_tk_widget().pack(fill=tk.BOTH, expand=True)
+        wedges, texts, autotexts = ax.pie(
+            sizes,
+            labels=None,
+            autopct='%1.1f%%',
+            pctdistance=0.70,
+            colors=colors,
+            startangle=90,
+            wedgeprops={'width': 0.45, 'edgecolor': 'white', 'linewidth': 2},
+        )
 
-        self.fig_ventas = plt.Figure(figsize=(6, 4), dpi=100)
-        self.ax_ventas = self.fig_ventas.add_subplot(111)
-        self.canvas_ventas = FigureCanvasTkAgg(self.fig_ventas, master=self.tab_ventas)
-        self.canvas_ventas.get_tk_widget().pack(fill=tk.BOTH, expand=True)
+        for autotext in autotexts:
+            autotext.set_fontsize(9)
+            autotext.set_fontweight('bold')
+            autotext.set_color('#1E293B')
+            autotext.set_bbox(dict(boxstyle='round,pad=0.2', fc='white', alpha=0.8, ec='#E2E8F0', lw=0.5))
 
-        self.fig_abc = plt.Figure(figsize=(6, 4), dpi=100)
-        self.ax_abc = self.fig_abc.add_subplot(111)
-        self.canvas_abc = FigureCanvasTkAgg(self.fig_abc, master=self.tab_abc)
-        self.canvas_abc.get_tk_widget().pack(fill=tk.BOTH, expand=True)
+        ax.legend(
+            wedges, labels,
+            loc='lower center',
+            bbox_to_anchor=(0.5, -0.22),
+            ncol=len(labels),
+            fontsize=9,
+            frameon=False,
+        )
 
-        self.fig_seguridad = plt.Figure(figsize=(6, 4), dpi=100)
-        self.ax_seguridad = self.fig_seguridad.add_subplot(111)
-        self.canvas_seguridad = FigureCanvasTkAgg(self.fig_seguridad, master=self.tab_seguridad)
-        self.canvas_seguridad.get_tk_widget().pack(fill=tk.BOTH, expand=True)
+        ax.axis('equal')
+        self._estilo_ax(ax, title)
 
     def cargar_fechas(self):
         try:
             conexion = get_connection()
             if not conexion:
                 return
-
             cursor = conexion.cursor()
-            query = "SELECT DISTINCT fecha_calculo FROM Resultados_Modelos ORDER BY fecha_calculo DESC"
-            cursor.execute(query)
+            cursor.execute("SELECT DISTINCT fecha_calculo FROM Resultados_Modelos ORDER BY fecha_calculo DESC")
             resultados = cursor.fetchall()
             cursor.close()
             conexion.close()
 
-            fechas = []
-            for fila in resultados:
-                fecha_valor = fila[0]
-                if fecha_valor is not None:
-                    fechas.append(str(fecha_valor))
-
-            self.cb_fechas['values'] = fechas
+            fechas = [str(fila[0]) for fila in resultados if fila[0] is not None]
             if fechas:
-                self.cb_fechas.current(0)
+                self.cb_fechas.configure(values=fechas)
+                self.cb_fechas.set(fechas[0])
                 self.fecha_seleccionada = fechas[0]
         except Exception as e:
             print(f"Error al cargar fechas: {e}")
 
-    def on_fecha_select(self, event):
-        self.fecha_seleccionada = self.cb_fechas.get()
-        self.entry_busqueda.delete(0, tk.END)  # Limpiar campo de búsqueda
+    def on_fecha_select(self, fecha):
+        self.fecha_seleccionada = fecha
         self.cargar_reportes()
+
+    def cargar_parametros(self):
+        try:
+            conexion = get_connection()
+            if not conexion:
+                return 0
+            cursor = conexion.cursor(dictionary=True)
+            cursor.execute("SELECT AVG(tiempo_entrega) AS promedio_tiempo_entrega FROM Parametros")
+            resultado = cursor.fetchone()
+            cursor.close()
+            conexion.close()
+            if resultado and resultado.get('promedio_tiempo_entrega') is not None:
+                return float(resultado['promedio_tiempo_entrega'])
+        except Exception as e:
+            print(f"Error al cargar parámetros: {e}")
+        return 0
 
     def cargar_reportes(self):
         if not self.fecha_seleccionada:
             return
-
         try:
             conexion = get_connection()
             if not conexion:
-                print("Error: No se pudo conectar a la base de datos.")
+                messagebox.showerror("Error", "No se pudo conectar a la base de datos.")
                 return
 
             cursor = conexion.cursor(dictionary=True)
             query = '''
-                SELECT
-                    r.id_resultado,
-                    r.id_producto,
-                    p.nombre AS Producto,
-                    p.stock_actual,
-                    r.EOQ,
-                    r.PRO,
-                    r.inventario_seguridad,
-                    r.fecha_calculo,
-                    r.ventas_anuales,
-                    r.porcentaje,
-                    r.porcentaje_acumulado,
-                    r.costo_anual_ordenar,
-                    r.costo_anual_conservacion,
-                    r.costo_total,
-                    r.punto_reorden,
-                    r.clasificacion_ABC
+                SELECT r.id_resultado, r.id_producto,
+                       p.nombre AS Producto, p.stock_actual,
+                       r.EOQ, r.PRO, r.inventario_seguridad,
+                       r.fecha_calculo, r.ventas_anuales,
+                       r.porcentaje, r.porcentaje_acumulado,
+                       r.costo_anual_ordenar, r.costo_anual_conservacion,
+                       r.costo_total, r.punto_reorden, r.clasificacion_ABC
                 FROM Resultados_Modelos r
                 LEFT JOIN Productos p ON p.id_producto = r.id_producto
                 WHERE r.fecha_calculo = %s
@@ -253,126 +280,128 @@ class ReportesFrame(tk.Frame):
 
             self.df_datos = pd.DataFrame(datos)
 
-            for item in self.tree.get_children():
-                self.tree.delete(item)
-
             if self.df_datos.empty:
                 messagebox.showinfo("Reportes", "No hay datos para la fecha seleccionada.")
                 self.limpiar_graficas()
+                self.actualizar_kpis('-', 0, 0, 0)
                 return
 
-            # Guardar datos originales para búsqueda
-            self.datos_originales = self.df_datos.to_dict('records')
-
-            for _, row in self.df_datos.iterrows():
-                self.tree.insert(
-                    "",
-                    tk.END,
-                    values=(
-                        row.get('Producto', ''),
-                        int(row.get('EOQ', 0)) if pd.notnull(row.get('EOQ')) else 0,
-                        int(row.get('PRO', 0)) if pd.notnull(row.get('PRO')) else 0,
-                        int(row.get('inventario_seguridad', 0)) if pd.notnull(row.get('inventario_seguridad')) else 0,
-                        f"₡{row.get('ventas_anuales', 0):,.2f}" if pd.notnull(row.get('ventas_anuales')) else "₡0.00",
-                        row.get('clasificacion_ABC', '')
-                    )
-                )
-
+            promedio = self.cargar_parametros()
+            producto_estrella, mayor_eoq, riesgo = self.calcular_kpis()
+            self.actualizar_kpis(producto_estrella, mayor_eoq, promedio, riesgo)
             self.actualizar_graficas()
 
         except Exception as e:
             print(f"Error al cargar reportes: {e}")
             messagebox.showerror("Error", f"Ocurrió un error al cargar los reportes:\n{e}")
 
+    def calcular_kpis(self):
+        producto_estrella = '-'
+        mayor_eoq = 0
+        productos_en_riesgo = 0
+
+        if not self.df_datos.empty:
+            df = self.df_datos.copy()
+            df['ventas_anuales'] = pd.to_numeric(df.get('ventas_anuales', 0), errors='coerce').fillna(0)
+            producto_estrella = df.sort_values('ventas_anuales', ascending=False).iloc[0].get('Producto', '-')
+
+            df['EOQ'] = pd.to_numeric(df.get('EOQ', 0), errors='coerce').fillna(0)
+            mayor_eoq = int(df['EOQ'].max())
+
+            df['stock_actual'] = pd.to_numeric(df.get('stock_actual', 0), errors='coerce').fillna(0)
+            df['inventario_seguridad'] = pd.to_numeric(df.get('inventario_seguridad', 0), errors='coerce').fillna(0)
+            productos_en_riesgo = int((df['stock_actual'] < df['inventario_seguridad']).sum())
+
+        return producto_estrella, mayor_eoq, productos_en_riesgo
+
+    def actualizar_kpis(self, producto_estrella, mayor_eoq, promedio_tiempo_entrega, productos_en_riesgo):
+        self.kpi_labels['producto_estrella'].configure(text=str(producto_estrella))
+        self.kpi_labels['mayor_eoq'].configure(text=f"{mayor_eoq:,}")
+        if 'mayor_eoq' in self.kpi_subtitles:
+            self.kpi_subtitles['mayor_eoq'].configure(text=f'{producto_estrella}')
+        self.kpi_labels['promedio_tiempo_entrega'].configure(text=f"{promedio_tiempo_entrega:.1f} días")
+        
+        # Color dinámico limpio para el estado crítico
+        color = self.color_exito if productos_en_riesgo == 0 else "#DC2626"
+        self.kpi_labels['productos_en_riesgo'].configure(text=str(productos_en_riesgo), text_color=color)
+
     def limpiar_graficas(self):
-        self.ax_eoq.clear()
-        self.ax_ventas.clear()
-        self.ax_abc.clear()
-        self.ax_seguridad.clear()
-        self.canvas_eoq.draw()
-        self.canvas_ventas.draw()
-        self.canvas_abc.draw()
-        self.canvas_seguridad.draw()
+        for ax in (self.ax_ventas, self.ax_abc, self.ax_seguridad):
+            ax.clear()
+        self.canvas.draw()
 
     def actualizar_graficas(self):
+        for ax in (self.ax_ventas, self.ax_abc, self.ax_seguridad):
+            ax.clear()
+
         if self.df_datos.empty:
-            self.limpiar_graficas()
+            self.canvas.draw()
             return
 
-        self.ax_eoq.clear()
-        self.ax_ventas.clear()
-        self.ax_abc.clear()
+        # ── 1. Top 10 Ventas ────────────────────────────────────────────────
+        df_v = self.df_datos[['Producto', 'ventas_anuales']].copy()
+        df_v['ventas_anuales'] = pd.to_numeric(df_v['ventas_anuales'], errors='coerce').fillna(0)
+        df_v = df_v.sort_values('ventas_anuales', ascending=True).tail(10)
 
-        colores = ['#0A1F44', '#5A7FB8', '#8FA6D7', '#C3D1EB']
+        # Usando la paleta secundaria unificada
+        bars = self.ax_ventas.barh(
+            df_v['Producto'], df_v['ventas_anuales'],
+            color=self.color_secundario, edgecolor='white', linewidth=0.5
+        )
 
-        df_eoq = self.df_datos[['Producto', 'EOQ']].copy()
-        df_eoq['EOQ'] = pd.to_numeric(df_eoq['EOQ'], errors='coerce').fillna(0)
-        df_eoq = df_eoq.sort_values('EOQ', ascending=False).head(10)
-        self.ax_eoq.bar(df_eoq['Producto'], df_eoq['EOQ'], color=colores[1])
-        self.ax_eoq.set_title('EOQ por Producto', color='#0A1F44', fontweight='bold')
-        self.ax_eoq.set_ylabel('Cantidad', color='#0A1F44')
-        self.ax_eoq.tick_params(axis='x', rotation=45, labelsize=8)
+        max_val = df_v['ventas_anuales'].max()
+        self.ax_ventas.xaxis.set_major_formatter(
+            mticker.FuncFormatter(lambda x, pos: f"₡{x/1e6:.0f}M")
+        )
 
-        df_ventas = self.df_datos[['Producto', 'ventas_anuales']].copy()
-        df_ventas['ventas_anuales'] = pd.to_numeric(df_ventas['ventas_anuales'], errors='coerce').fillna(0)
-        df_ventas = df_ventas.sort_values('ventas_anuales', ascending=False).head(10)
-        self.ax_ventas.bar(df_ventas['Producto'], df_ventas['ventas_anuales'], color=colores[2])
-        self.ax_ventas.set_title('Ventas Anuales por Producto', color='#0A1F44', fontweight='bold')
-        self.ax_ventas.set_ylabel('Ventas Anuales ₡', color='#0A1F44')
         self.ax_ventas.tick_params(axis='x', rotation=45, labelsize=8)
+        self.ax_ventas.set_xlim(0, max_val * 1.15)
+        self.ax_ventas.set_xlabel('Ventas Anuales', color=self.color_primario, fontsize=9, fontweight='bold')
+        self.ax_ventas.tick_params(axis='both', labelsize=8, colors=self.color_primario)
+        
+        # Eliminando bordes innecesarios (Spines) y suavizando las líneas restantes
+        self.ax_ventas.spines[['top', 'right']].set_visible(False)
+        self.ax_ventas.spines[['left', 'bottom']].set_color('#CBD5E1')
+        self.ax_ventas.spines[['left', 'bottom']].set_linewidth(1)
 
+        self._estilo_ax(self.ax_ventas, 'Top 10 Ventas Anuales')
+
+        # ── 2. Clasificación ABC ─────────────────────────────────────────────
         if 'clasificacion_ABC' in self.df_datos.columns:
             abc_counts = self.df_datos['clasificacion_ABC'].fillna('N/A').value_counts()
-            labels = []
-            sizes = []
+            sizes, labels = [], []
             for cat in ['A', 'B', 'C']:
                 if cat in abc_counts:
                     labels.append(cat)
                     sizes.append(abc_counts[cat])
 
-            if sizes:
-                def autopct_with_label(pct, all_labels=labels):
-                    autopct_with_label.index = getattr(autopct_with_label, 'index', 0)
-                    label = all_labels[autopct_with_label.index] if autopct_with_label.index < len(all_labels) else ''
-                    text = f"{label} {pct:.1f}%"
-                    autopct_with_label.index += 1
-                    return text
+            self._grafico_pastel(
+                self.ax_abc, sizes, labels,
+                colors=[self.color_primario, self.color_secundario, self.color_exito],
+                title='Clasificación ABC'
+            )
 
-                self.ax_abc.pie(
-                    sizes,
-                    labels=labels,
-                    autopct=autopct_with_label,
-                    colors=['#0A1F44', '#5A7FB8', '#8FA6D7'],
-                    textprops={'color': 'white'}
-                )
-                self.ax_abc.set_title('Clasificación ABC', color='#0A1F44', fontweight='bold')
+        # ── 3. Seguridad de Inventario ───────────────────────────────────────
+        df_s = self.df_datos.copy()
+        df_s['stock_actual'] = pd.to_numeric(df_s.get('stock_actual', 0), errors='coerce').fillna(0)
+        df_s['inventario_seguridad'] = pd.to_numeric(df_s.get('inventario_seguridad', 0), errors='coerce').fillna(0)
 
-        # Inventario de seguridad: productos en riesgo vs seguros
-        df_seguridad = self.df_datos.copy()
-        df_seguridad['stock_actual'] = pd.to_numeric(df_seguridad.get('stock_actual', 0), errors='coerce').fillna(0)
-        df_seguridad['inventario_seguridad'] = pd.to_numeric(df_seguridad.get('inventario_seguridad', 0), errors='coerce').fillna(0)
-        riesgo = int((df_seguridad['stock_actual'] < df_seguridad['inventario_seguridad']).sum())
-        seguro = int((df_seguridad['stock_actual'] >= df_seguridad['inventario_seguridad']).sum())
+        riesgo = int((df_s['stock_actual'] < df_s['inventario_seguridad']).sum())
+        seguro = int((df_s['stock_actual'] >= df_s['inventario_seguridad']).sum())
 
         if riesgo + seguro > 0:
-            self.ax_seguridad.pie(
-                [riesgo, seguro],
-                labels=['En riesgo', 'Seguro'],
-                autopct='%1.1f%%',
-                colors=['#E74C3C', '#2ECC71'],
-                startangle=90,
-                textprops={'color': 'white'}
+            # Colores del gráfico de dona unificados con el concepto de Riesgo/Éxito
+            self._grafico_pastel(
+                self.ax_seguridad,
+                sizes=[riesgo, seguro],
+                labels=[f'En riesgo ({riesgo})', f'Seguro ({seguro})'],
+                colors=[self.color_alerta, self.color_exito],
+                title='Seguridad de Inventario'
             )
-            self.ax_seguridad.set_title('Cumplimiento Inventario de Seguridad', color='#0A1F44', fontweight='bold')
 
-        self.fig_eoq.tight_layout()
-        self.fig_ventas.tight_layout()
-        self.fig_abc.tight_layout()
-        self.fig_seguridad.tight_layout()
-        self.canvas_eoq.draw()
-        self.canvas_ventas.draw()
-        self.canvas_abc.draw()
-        self.canvas_seguridad.draw()
+        # Ajuste de layout seguro antes del dibujado en el Canvas
+        self.fig.tight_layout()
+        self.canvas.draw()
 
     def exportar_reporte(self):
         ruta_archivo = filedialog.asksaveasfilename(
@@ -380,10 +409,8 @@ class ReportesFrame(tk.Frame):
             filetypes=[("Archivos de Excel", "*.xlsx"), ("Todos los archivos", "*.*")],
             title="Guardar Reporte"
         )
-
         if not ruta_archivo:
             return
-
         try:
             conexion = get_connection()
             if not conexion:
@@ -392,22 +419,13 @@ class ReportesFrame(tk.Frame):
 
             cursor = conexion.cursor(dictionary=True)
             query = '''
-                SELECT
-                    r.id_resultado,
-                    r.id_producto,
-                    p.nombre AS Producto,
-                    r.EOQ,
-                    r.PRO,
-                    r.inventario_seguridad,
-                    r.fecha_calculo,
-                    r.ventas_anuales,
-                    r.porcentaje,
-                    r.porcentaje_acumulado,
-                    r.costo_anual_ordenar,
-                    r.costo_anual_conservacion,
-                    r.costo_total,
-                    r.punto_reorden,
-                    r.clasificacion_ABC
+                SELECT r.id_resultado, r.id_producto,
+                       p.nombre AS Producto, p.stock_actual,
+                       r.EOQ, r.PRO, r.inventario_seguridad,
+                       r.fecha_calculo, r.ventas_anuales,
+                       r.porcentaje, r.porcentaje_acumulado,
+                       r.costo_anual_ordenar, r.costo_anual_conservacion,
+                       r.costo_total, r.punto_reorden, r.clasificacion_ABC
                 FROM Resultados_Modelos r
                 LEFT JOIN Productos p ON p.id_producto = r.id_producto
                 WHERE r.fecha_calculo = %s
@@ -422,53 +440,18 @@ class ReportesFrame(tk.Frame):
                 messagebox.showwarning("Advertencia", "No hay datos para exportar.")
                 return
 
-            df_export = pd.DataFrame(datos)
-            df_export.to_excel(ruta_archivo, index=False)
+            pd.DataFrame(datos).to_excel(ruta_archivo, index=False)
             messagebox.showinfo("Éxito", f"Reporte exportado correctamente a:\n{ruta_archivo}")
         except Exception as e:
             messagebox.showerror("Error", f"Ocurrió un error al exportar:\n{e}")
 
-    def on_buscar_tiempo_real(self, event=None):
-        """Realiza búsqueda en tiempo real mientras se escribe en el campo."""
-        if not self.datos_originales:
-            return
-        
-        termino_busqueda = self.entry_busqueda.get().strip().lower()
-        
-        # Limpiar tabla
-        for item in self.tree.get_children():
-            self.tree.delete(item)
-        
-        # Si no hay término de búsqueda, mostrar todos los datos
-        if not termino_busqueda:
-            datos_filtrados = self.datos_originales
-        else:
-            # Filtrar datos que coincidan con el término de búsqueda
-            datos_filtrados = []
-            for producto in self.datos_originales:
-                # Buscar en producto
-                if termino_busqueda in str(producto.get('Producto', '')).lower():
-                    datos_filtrados.append(producto)
-        
-        # Insertar datos filtrados en la tabla
-        for row in datos_filtrados:
-            self.tree.insert(
-                "",
-                tk.END,
-                values=(
-                    row.get('Producto', ''),
-                    int(row.get('EOQ', 0)) if pd.notnull(row.get('EOQ')) else 0,
-                    int(row.get('PRO', 0)) if pd.notnull(row.get('PRO')) else 0,
-                    int(row.get('inventario_seguridad', 0)) if pd.notnull(row.get('inventario_seguridad')) else 0,
-                    f"₡{row.get('ventas_anuales', 0):,.2f}" if pd.notnull(row.get('ventas_anuales')) else "₡0.00",
-                    row.get('clasificacion_ABC', '')
-                )
-            )
 
 if __name__ == "__main__":
-    root = tk.Tk()
+    # Inicialización usando la estética por defecto de customtkinter
+    ctk.set_appearance_mode("Light")
+    root = ctk.CTk()
     root.title("Prueba de Reportes")
-    root.geometry("1000x800")
+    root.geometry("1300x850")
     app = ReportesFrame(master=root)
     app.pack(fill=tk.BOTH, expand=True)
     root.mainloop()
