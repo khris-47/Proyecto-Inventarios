@@ -498,17 +498,24 @@ class GestionInventariosFrame(ctk.CTkFrame):
                     tiempo_entrega=tiempo_entrega,
                     variabilidad_demanda=variabilidad_demanda
                 )
-                messagebox.showinfo("Producto actualizado", "El producto se actualizó correctamente.")
+                
+                # 1. Liberar y destruir la ventana PRIMERO
                 if self.ventana_agregar.winfo_exists():
                     self.ventana_agregar.grab_release()
                     self.ventana_agregar.destroy()
+                
                 self.editar_producto_id = None
                 self.cargar_datos()
+                
+                # 2. Mostrar el mensaje DESPUÉS de cerrar el formulario
+                messagebox.showinfo("Producto actualizado", "El producto se actualizó correctamente.")
+                
             except Exception as e:
                 messagebox.showerror("Error", f"No se pudo actualizar el producto: {e}")
         else:
             try:
-                self._insert_producto(
+                # _insert_producto ahora solo gestiona BD y retorna el código
+                codigo_final = self._insert_producto(
                     nombre=nombre,
                     categoria=categoria,
                     stock_actual=stock_actual,
@@ -520,6 +527,17 @@ class GestionInventariosFrame(ctk.CTkFrame):
                     tiempo_entrega=tiempo_entrega,
                     variabilidad_demanda=variabilidad_demanda
                 )
+                
+                # 1. Liberar y destruir la ventana PRIMERO
+                if self.ventana_agregar.winfo_exists():
+                    self.ventana_agregar.grab_release()
+                    self.ventana_agregar.destroy()
+                    
+                self.cargar_datos()
+                
+                # 2. Mostrar el mensaje DESPUÉS de cerrar el formulario
+                messagebox.showinfo("Producto agregado", f"Producto agregado con código {codigo_final}.")
+                
             except Exception as e:
                 messagebox.showerror("Error", f"No se pudo guardar el producto: {e}")
                 return
@@ -554,8 +572,7 @@ class GestionInventariosFrame(ctk.CTkFrame):
                          costo_mantenimiento, tiempo_entrega, variabilidad_demanda):
         connection = get_connection()
         if not connection:
-            messagebox.showerror("Error", "No se pudo establecer la conexión con la base de datos.")
-            return
+            raise Exception("No se pudo establecer la conexión con la base de datos.")
 
         cursor = None
         try:
@@ -567,12 +584,7 @@ class GestionInventariosFrame(ctk.CTkFrame):
                 "VALUES (%s, %s, %s, %s, %s, %s)"
             )
             cursor.execute(insert_producto, (
-                codigo_temporal,
-                nombre,
-                categoria,
-                stock_actual,
-                costo_unitario,
-                proveedor
+                codigo_temporal, nombre, categoria, stock_actual, costo_unitario, proveedor
             ))
 
             id_producto = cursor.lastrowid
@@ -587,22 +599,18 @@ class GestionInventariosFrame(ctk.CTkFrame):
                 "VALUES (%s, %s, %s, %s, %s, %s)"
             )
             cursor.execute(insert_parametros, (
-                id_producto,
-                demanda_anual,
-                costo_pedido,
-                costo_mantenimiento,
-                tiempo_entrega,
-                variabilidad_demanda
+                id_producto, demanda_anual, costo_pedido, costo_mantenimiento, tiempo_entrega, variabilidad_demanda
             ))
 
             connection.commit()
-            messagebox.showinfo("Producto agregado", f"Producto agregado con código {codigo_final}.")
-            self.ventana_agregar.destroy()
-            self.cargar_datos()
+            
+            # Retornamos el código hacia guardar_producto en lugar de usar la interfaz gráfica aquí
+            return codigo_final  
+
         except Exception as e:
             if connection:
                 connection.rollback()
-            raise
+            raise e
         finally:
             if cursor:
                 cursor.close()

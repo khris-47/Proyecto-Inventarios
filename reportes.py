@@ -21,8 +21,8 @@ class ReportesFrame(ctk.CTkFrame):  # Cambiado a CTkFrame para consistencia
         # Paleta de colores unificada
         self.color_primario = "#0A1F44"
         self.color_secundario = "#5A7FB8"
-        self.color_exito = "#10B981"       # Verde esmeralda moderno
-        self.color_alerta = "#EF4444"      # Rojo suave moderno para el Riesgo
+        self.color_exito = "#0DC588"       
+        self.color_alerta = "#C72E2E"      
         self.color_texto = "#1E293B"
 
         self.crear_panel_navbar()
@@ -56,8 +56,6 @@ class ReportesFrame(ctk.CTkFrame):  # Cambiado a CTkFrame para consistencia
         )
         lbl_fecha.pack(side=tk.LEFT, padx=(0, 8))
 
-        # Reemplazo por un CTkComboBox moderno y estilizado internamente
-        # Alternativa con CTkOptionMenu (Menú de opciones plano y moderno)
         self.cb_fechas = ctk.CTkOptionMenu(
             controls,
             width=220,
@@ -104,7 +102,6 @@ class ReportesFrame(ctk.CTkFrame):  # Cambiado a CTkFrame para consistencia
         self.kpi_subtitles = {}
 
         for index, item in enumerate(tarjeta_info):
-            # Tarjetas refinadas con bordes suaves y redondeados
             tarjeta = ctk.CTkFrame(
                 self.kpi_frame, 
                 fg_color="white", 
@@ -115,12 +112,12 @@ class ReportesFrame(ctk.CTkFrame):  # Cambiado a CTkFrame para consistencia
             tarjeta.grid(row=0, column=index, sticky='nsew', padx=6, pady=2)
             self.kpi_frame.grid_columnconfigure(index, weight=1)
 
-            # --- TÍTULOS DE LOS KPIS MÁS GRANDES ---
+            
             ctk.CTkLabel(
                 tarjeta,
                 text=f"{item['icono']} {item['titulo']}",
                 text_color=item['color'],
-                font=("Segoe UI", 14, "bold")  # Aumentado de 11 a 14 para mayor jerarquía
+                font=("Segoe UI", 14, "bold")  
             ).pack(anchor='center', padx=12, pady=(18, 2))
 
             subtitle = None
@@ -128,8 +125,8 @@ class ReportesFrame(ctk.CTkFrame):  # Cambiado a CTkFrame para consistencia
                 subtitle = ctk.CTkLabel(
                     tarjeta,
                     text='',
-                    text_color="#64748B",  # Texto gris para mejorar jerarquía visual
-                    font=("Segoe UI", 10, "italic") # Ajustado a 10 para balancear con el título
+                    text_color="#64748B",  
+                    font=("Segoe UI", 10, "italic")
                 )
                 subtitle.pack(anchor='center', padx=12, pady=(0, 2))
                 self.kpi_subtitles[item['atributo']] = subtitle
@@ -138,7 +135,7 @@ class ReportesFrame(ctk.CTkFrame):  # Cambiado a CTkFrame para consistencia
                 tarjeta, 
                 text="-",
                 text_color=self.color_primario,
-                font=("Segoe UI", 24, "bold")  # Aumentado ligeramente a 24 para que guarde proporción
+                font=("Segoe UI", 24, "bold") 
             )
             valor.pack(anchor='center', padx=12, pady=(0, 18))
             self.kpi_labels[item['atributo']] = valor
@@ -146,7 +143,7 @@ class ReportesFrame(ctk.CTkFrame):  # Cambiado a CTkFrame para consistencia
         self.main_frame = ctk.CTkFrame(self, fg_color="transparent")
         self.main_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=(0, 20))
 
-        # Tarjeta contenedora para los gráficos unificados
+        
         tarjeta_graficos = ctk.CTkFrame(
             self.main_frame,
             fg_color="white",
@@ -157,12 +154,12 @@ class ReportesFrame(ctk.CTkFrame):  # Cambiado a CTkFrame para consistencia
         tarjeta_graficos.pack(fill=tk.BOTH, expand=True)
 
         self.fig = plt.Figure(figsize=(14, 4.5), dpi=100)
-        self.fig.patch.set_facecolor('white') # El lienzo ahora es blanco puro
+        self.fig.patch.set_facecolor('white') 
 
         gs = gridspec.GridSpec(
             1, 3,
             figure=self.fig,
-            left=0.08, right=0.96, # Ajustado el margen izquierdo para evitar textos recortados
+            left=0.08, right=0.96, 
             top=0.88, bottom=0.20,
             wspace=0.38
         )
@@ -175,7 +172,7 @@ class ReportesFrame(ctk.CTkFrame):  # Cambiado a CTkFrame para consistencia
         self.canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
 
     def _estilo_ax(self, ax, title):
-        """Aplica fondo blanco y título uniforme a un eje."""
+       
         ax.set_facecolor('white')
         ax.set_title(title, color=self.color_primario, fontweight='bold', fontsize=11, pad=12)
 
